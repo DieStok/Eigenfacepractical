@@ -11,6 +11,112 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #unsupervised learning day 1
 
+#part 1: clustering
+
+We'll start by performing some K-means clustering. The code block below generates some random data with which to perform the clustering. We colour the points according to the pre-set cluster they are supposed to belong to.
+
+
+```{r}
+
+meanX = c(2,2.5,8,7.3)
+meanY = c(2, 7.9, 2.33, 9)
+sds   = c(1, 1.5, 1.3, 0.85)
+nPoints = rep(25, 4)
+clusterIdentity = c(rep("1", 25), rep("2",25), rep("3",25), rep("4",25))
+
+xValues = purrr::pmap(list(nPoints, meanX, sds), rnorm)
+yValues = purrr::pmap(list(nPoints, meanY, sds), rnorm)
+
+dataforClustering = as_tibble(list("Gene 1 Expression" = unlist(xValues),
+                                    "Gene 2 Expression" = unlist(yValues),
+                                   "Cluster" = clusterIdentity))
+
+
+ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "Cluster")) + geom_point(size = 3) +
+  theme_bw() +
+  
+  
+
+```
+Now it is time to perform some clustering on this data. Run the code block below, and answer the questions.
+
+
+```{r}
+centersForRuns = vector("list", 4)
+
+for( i in seq_along(centersForRuns)) {
+  centersForRuns[[i]] = dataforClustering[sample(seq(1:nrow(dataforClustering)), 4), 1:2]
+  kMeans
+  }
+centersForRuns 
+
+
+kmeans(dataforClustering[, 1:2], 4)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#part 2 eigenface introduction to PCA
 You've learned about the importance of clustering and dimensionality reduction. Let's put them into practice. Before we dive into a biological example, let's use something that our brains are especially well-wired to interpret and think about: faces.
 
 The question is: can we take pictures of human faces, run them through dimensionality reduction, and still keep most of the, well, face-ness intact? Start by running the code below to import images of faces (specifically, from here: http://vis-www.cs.umass.edu/lfw/ , and within that data only those people whose names start with a).
@@ -89,7 +195,7 @@ Now, up to you to question the data somewhat. Answer the following questions usi
 Q1: How many data points are there?
 Q2: How many unique people are in this dataset?
 Q3: Whose face is most represented in this dataset, and how many times is that face represented?
-Q4: What does the distribution of counts look like? (use hist)
+Q4: What does the distribution of counts of people look like? (use hist)
 
 **Hint: you can use functions like str_replace_all to change '.jpg' into an empty space ''. If you do the same for numbers and underscores, you are left with only the names. Then you can use the unique() function and table() along with which.max() to get the answers**
 
@@ -147,14 +253,15 @@ Now that you've gotten to know the data some, let's do what we set out to do. Fi
 
 Q5: What do the numbers printed in the matrix signify? 
 Q6: What is the dimension of the input space?
-Q7: Do you think that this n*n-dimensional space is evenly (or randomly) filled with examples from this data, or not? Why?
+Q7: Do you think that this n*n-dimensional space is evenly (or randomly) filled with examples from this data, or not? Why? #PERHAPS MAKE HERE A RANDOM GRAYSCALE IMAGE. 
 Q8: Do you think it is a logical step to perform PCA, a linear dimension reduction method, on this (type of) data?
 
+##
 
 
 ```{r}
 someImage = sample(greyImageList, 1)[[1]]
-print(someImage)
+print(someImage[1:50, 1:50])
 dim(someImage)
 
 ```
@@ -209,10 +316,10 @@ meanSubtractedGreyImageDataFrame = greyImageDataFrame - avgFace
 ```
 
 
-Okay, with that done we can do our PCA. We'll pare our set down to 256 faces to speed up calculation. The beauty of this approach is that we can visualise what, exactly, PCA is doing. Normally, we cannot. Go ahead and run the following code. In it, we perform PCA, and then look at the 10 eigenvectors with the largest eigenvalues, or in less technical terms: the 10D representation of the data that captures most of the variance. Since each eigenvector is 62500-dimensional, you can simply put it back into the form of an image and look at it, to see what each image represents. In other words: you can look at the largest variance from the mean face, and then the second largest, etc. in this dataset.
+Okay, with that done we can do our PCA. We'll pare our set down to 256 faces to speed up calculation. The beauty of this approach is that we can visualise what, exactly, PCA is doing. Normally, we cannot. Go ahead and run the following code. In it, we perform PCA, and then look at the 10 eigenvectors with the largest eigenvalues, or in less technical terms: the 10D representation of the data that captures most of the variance. Since each eigenvector is 62500-dimensional, you can simply put it back into the form of an image and look at it, to see what each image represents. In other words: you can look at the largest variance from the mean face, and then the second largest, etc. in this dataset. This allows you to visually inspect what each principal component might represent.
 
 
-```{r}
+```{r, fig.width=7, fig.height=7}
 
 #step 1: we'll randomly remove 75% of the images: otherwise things will take a LONG time to calculate
 
@@ -245,12 +352,13 @@ for (component in seq(1:10)) {
 
 ```
 
+In these images, the greyer an area, the larger its importance on this Principal component.##IS THIS TRUE?
 
-
-Q11: First, scroll up to look at the normal input faces we fed into our PCA again. Given the variability in these faces, what do you think the first five principal components might roughly correspond to? Think of orientation (left-right and where the face is in the image) and some prominent facial features. (Note: this question is hard to do wrong, but also hard to do exactly right).
+Q11: First, scroll up to look at the normal input faces we fed into our PCA again. Given the variability in these faces (and backgrounds!), what do you think the first five principal components might roughly correspond to? Think of orientation (left-right and where the face is in the image), background brightness, and some prominent facial features. (Note: this question is hard to do wrong, but also hard to do exactly right).
 
 Q12: The first principal component is the dimension along which faces in this dataset vary the most from the mean. Why do you think that it looks as it does?
 
+##Answer: It is probable that PC1, at least, has something to do with the background brightness
 
 PCA is dimensionality reduction. So let's see: in how many dimensions can we put our data to still capture most of the variance? Run the following code and look at the plots, then answer the questions below.
 
@@ -379,16 +487,34 @@ show(plot2D)
 
 ```
 
-Seems like Ariel Sharon is hanging out mostly in one area. 
+Seems like Ariel Sharon is hanging out mostly in one area. In fact, it seems that Ariel Sharon is mostly to one side of PC1. Can we see why? Run the code below, and answer the question.
 
-##THIS MIGHT GO WRONG BECAUSE OF THE RANDOM SEED!##
-Q15 Let's look at two pictures featuring Sharon from the Sharon-region, and some outlying Sharon-points. Is there any difference that catches your eye, or not?
 
-##Answer: no, not really. It doesn't seem like they are that different. It's not that easily interpretable, judging these images along differences in just 1 principal component that accounts for ~12% of the variation.##
 
 ```{r, fig.width=4, fig.height=4}
+#select points based on PC1 coordinates
 outlierRows = dataWithSharonNotSharon[sampledDataPointsSharon, ][dataWithSharonNotSharon[sampledDataPointsSharon, ]$PC1 < 0,]
+normalRows  = dataWithSharonNotSharon[sampledDataPointsSharon, ][dataWithSharonNotSharon[sampledDataPointsSharon, ]$PC1 >= 0,]
+
+#Becaue the sign of the coordinates on the PC is random, I need to make sure that what I call outliers or not based on PC1 are indeed the outliers. I do this by checking that the outliers are the fewest datapoints, while normal comprises  most of the points.
+if (nrow(normalRows) < nrow(outlierRows)) {
+  #flip them around
+  realNormal = outlierRows
+  outlierRows = normalRows
+  normalRows = realNormal
+  
+}
+
 sharonOutlierImageIndices = as.numeric(str_replace_all(rownames(outlierRows), "face", ""))
+sharonNormalImageIndices  = as.numeric(str_replace_all(rownames(normalRows), "face", ""))
+
+
+#plot the images of normal and outlier Sharons based on PC1
+for (index in sample(sharonNormalImageIndices, length(sharonNormalImageIndices)/2)) {
+  image(greyImageList[[index]][, nrow(greyImageList[[index]]):1],
+        col = gray.colors(256, 0, 1),
+        main = paste0("Sharon Normal" ))
+}
 
 for (index in sharonOutlierImageIndices) {
   image(greyImageList[[index]][, nrow(greyImageList[[index]]):1],
@@ -396,34 +522,96 @@ for (index in sharonOutlierImageIndices) {
         main = paste0("Sharon Outlier" ))
 }
 
-normalRows = dataWithSharonNotSharon[sampledDataPointsSharon, ][dataWithSharonNotSharon[sampledDataPointsSharon, ]$PC1 >= 0,]
-sharonNormalImageIndices = as.numeric(str_replace_all(rownames(normalRows), "face", ""))
 
-for (index in sample(sharonNormalImageIndices, length(sharonNormalImageIndices)/2)) {
-  image(greyImageList[[index]][, nrow(greyImageList[[index]]):1],
-        col = gray.colors(256, 0, 1),
-        main = paste0("Sharon Normal" ))
+
+
+
+
+```
+Q15 Do you see any obvious differences between the outliers and normal points? Do you think this is logical? How does this reflect on your earlier answer to what PC1 seemed to do?
+
+##Answer: It is hard to tell. It could be that the images differ mostly in the brightness of their background: it looks like the normal images have brighter backgrounds than the outliers. But it is hard to be sure. However, it is very well possible that lightning conditions of the background is a major point of variance. Still, it is hard to tell, and We don't expect that we could accurately judge these images along differences in just 1 principal component that accounts for only ~12% of the variation.##
+
+
+
+
+Now, there's actually quite a lot of variation in the faces in this dataset. Let's quickly check how PCA fares in another dataset with faces pictured from the front and with uniform background.
+
+```{r, fig.width=9.6, fig.height=5}
+#read data
+centeredFacesDataset = R.matlab::readMat("./CenteredFaces/faces.mat")
+
+#take an example matrix for reference purposes
+exampleFaceMatrix = centeredFacesDataset$face[[3]][[1]]
+
+#make the matrix modification into a function so I don't have to do that manually each time
+displayCenteredFace <- function(face, title = "") {
+  transposedFace = t(face)
+  reorderedFaceMatrixForDrawing = transposedFace[, ncol(transposedFace):1]
+  image(reorderedFaceMatrixForDrawing, col = gray.colors(256, 0, 1), main = title)
+  #don't return anything
+  k = invisible(TRUE)
+}
+
+#draw 10 example faces
+for (i in seq(1:10)) {
+  indexToDisplay = sample(seq(1:length(centeredFacesDataset$face)), 1)
+  displayCenteredFace(centeredFacesDataset$face[[indexToDisplay]][[1]], title = paste0("Face ", i))
+  
 }
 
 
+#put every image in a data frame as a 1728 by 1 vector.
+greyImageDataFrameCentered = data.frame(matrix(nrow = length(exampleFaceMatrix), ncol = length(centeredFacesDataset$face)))
+for (imageMatrixIndex in seq_along(centeredFacesDataset$face)) {
+  
+  greyImageDataFrameCentered[,imageMatrixIndex] = as.vector(centeredFacesDataset$face[[imageMatrixIndex]][[1]])
+  
+}
+rownames(greyImageDataFrameCentered) = paste0(rep("pixel", length(exampleFaceMatrix)), seq(1,length(exampleFaceMatrix)))
+colnames(greyImageDataFrameCentered) = paste0(rep("face", ncol(greyImageDataFrameCentered)),
+                                              seq(1,ncol(greyImageDataFrameCentered)))
+
+#See how that looks
+head(greyImageDataFrameCentered)
+
+#subtract the mean face
+avgCenteredFace = rowMeans(greyImageDataFrameCentered)
+normalisedCenteredFaces = greyImageDataFrameCentered - avgCenteredFace
+
+#do the pca
+pcaCenteredFaces = prcomp(normalisedCenteredFaces, scale = TRUE)
+
+#Assemble the top 10 principal components (eigenvectors) into images you can view (back to matrix form)
+eigenFacesList = list(10)
+for (PCnum in seq_along(colnames(pcaCenteredFaces$x[,1:10]))) {
+  eigenFacesList[[PCnum]] = matrix(pcaCenteredFaces$x[, PCnum], nrow = dim(exampleFaceMatrix)[1],
+                                 ncol = dim(exampleFaceMatrix)[2])
+  
+}
+#show the average face
+displayCenteredFace(matrix(avgCenteredFace, nrow = dim(exampleFaceMatrix)[1],
+                                 ncol = dim(exampleFaceMatrix)[2]), title = "Average face")
+
+#show the first 10 PCs
+purrr::map2(eigenFacesList, paste0("PC ", seq(1:10)), displayCenteredFace)
+
 ```
 
+Q16: what do you think the first few principal components correspond to here? Again, it is hard to be sure so feel free to speculate.
 
+##Answer: PC1 and PC2 both seem to focus on hair, PC3 could be about where, exactly, the shoulders are in the image, PC4 is just a scary lizardman put there by our overlords to scare us (real answer: no idea), PC5 might focus a bit on the type of collar/neck clothing.
 
-Now, there's actually quite a lot of variation in the faces in this dataset. Let's quickly check how PCA fares in another dataset with faces pictured from the front.
-
-```{r, fig.width=2, fig.height=2}
-
-centeredFacesDataset = R.matlab::readMat("./CenteredFaces/faces.mat")
-
-image(t(centeredFacesDataset$face[[2]][[1]])[, ncol(t(centeredFacesDataset$face[[2]][[1]])):1],
-        col = gray.colors(256, 0, 1))
+##let the students take a picture of themselves. --> make a face dataset out of that?
+## 
 
 
 
 
-```
-
+So far so good. We hope this has given you a bit more intuition about what PCA might be doing. Important takeaways are that:
+1. Even if you would think that manifold methods are the method of choice (faces are a very special case of n*n images, so you could probably represent them better in some reduced space specifically designed to pull them apart, i.e. the manifold containing faces) a linear method can still work well: with 100-150 PCs, you got a pretty good reconstruction of the face already, so you can reduce to this dimensionality and not lose too much discriminative power!
+2. PCA, on its own, is not a dimensionality reduction tool: running PCA just gives us the linearly rotated original space. It is up to us to select how much of the variance of the data we want to keep/think is enough for visualisation.
+3. It is not a given that a principal component is interpretable to us, or maps to a specific thing in the data: we got lucky that PC1 might correspond to something we can understand. Many of the PCs just look very strange.
 
 
 
