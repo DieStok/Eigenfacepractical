@@ -26,7 +26,7 @@ p_load(ggplot2, tidyverse, EBImage, stringr, devtools, R.matlab)
 install_github("vqv/ggbiplot")
 
 #get the file names
-faceDir = paste0(getwd(), "/Faces")
+faceDir = "./Faces"
 fileNames = list.files(path =faceDir, pattern=".*.jpg")
 str(fileNames)
 
