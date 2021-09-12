@@ -61,6 +61,52 @@ for( i in seq_along(centersForRuns)) {
   }
 centersForRuns 
 
+##KMEANS IN R IS SMARTER THAN WHAT YOU LEARN AS STANDARD DESCRIPTION!
+
+
+#implement own k-means function
+data = dataforClustering[, 1:2]; startCentroids = centersForRuns[[1]][, 1:2]
+k = 4
+iterations = 10
+distance = "euclidean"
+#doKMeans = function(data, startCentroids, k = 4, iterations = 10, distance = "euclidean") {
+  centroidList = vector("list", iterations)
+  clusterList  = vector("list", iterations)
+  currentCentroids = startCentroids
+  
+  for (i in seq(1:iterations)) {
+    
+    
+    
+    distancesList = vector("list", length = k)
+    for (clusterKDistance in seq(1:k)) { 
+      
+      if (distance == 'euclidean') {
+        
+        distVec = (data - currentCentroids[clusterKDistance, ])^2
+        
+      }
+      
+      distancesList[[clusterKDistance]] = distVec
+      
+      }
+    m = bind_cols(distancesList)
+    break
+    
+    
+    
+    newCentroids = data %>% group_by(currentCluster) %>% mean()
+    currentCentroids = newCentroids
+      
+    
+    
+    
+    
+  }
+  
+ 
+  
+}
 
 
 preClusterPlot   = function(data, centers) {
@@ -75,9 +121,9 @@ preClusterPlot   = function(data, centers) {
 }
 firstClusterPlot = function(data, centers) {
   
-dfCluster <- kmeans(data[, 1:2],centers=centersForRuns[[1]][, 1:2], iter.max = 1)
+dfCluster <- kmeans(data[, 1:2],centers=centers[, 1:2], iter.max = 1, algorithm = "MacQueen")
 centersForPlotting = dfCluster$centers %>% as_tibble() %>% add_column(centroid = as.factor(1:nrow(dfCluster$centers)))
-data$kMeansClusterIteration1 = as.character(dfCluster$cluster)
+dataforClustering$kMeansClusterIteration1 = as.character(dfCluster$cluster)
 firstIterationClusteringPlot = ggplot(data = data,
        aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "kMeansClusterIteration1")) +
   geom_point(size = 3) +
@@ -85,7 +131,7 @@ firstIterationClusteringPlot = ggplot(data = data,
              aes_string(fill = "centroid"),
              show.legend = NA) +
   theme_bw()
-  list(data = data, plot = firstIterationClusteringPlot)
+  firstIterationClusteringPlot
   
   
 }
@@ -107,7 +153,7 @@ iterationPlot = function(dataPoints, dataCenters, iteration) {
 beginPlot = preClusterPlot(data = dataforClustering, centers = centersForRuns[[1]])
 itOnePlot = firstClusterPlot(data = dataforClustering, centers = centersForRuns[[1]])
 show(beginPlot)
-show(itOnePlot[["plot"]])
+show(itOnePlot)
 
 
 
@@ -119,7 +165,7 @@ itPlotList = vector("list", length = max_iter)
 
 for (i in 2:max_iter){
   tryCatch({
-    dfCluster <- kmeans(dataforClustering[, 1:2], centers = dfCluster$centers, iter.max = 1)
+    dfCluster <- kmeans(dataforClustering[, 1:2], centers = dfCluster$centers, iter.max = 1, algorithm = "MacQueen")
     done <- TRUE
   }, 
   warning=function(w) {done <- FALSE})
@@ -129,9 +175,8 @@ for (i in 2:max_iter){
   if(done) break
 }
 
-for (itPlot in itPlotList) {
-  show(itPlot)
-}
+totalPlotListThisRun = list(beginPlot, itOnePlot)
+totalPlotListThisRun[3:(length(itPlotList)+3)] = itPlotList
 
 
 ```
