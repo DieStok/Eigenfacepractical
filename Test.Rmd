@@ -13,7 +13,19 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #part 1: clustering
 
-We'll start by performing some K-means clustering. The code block below generates some random data with which to perform the clustering. We colour the points according to the pre-set cluster they are supposed to belong to.
+We'll start by performing some K-means clustering. The code block below generates some random data with which to perform the clustering. We colour the points according to the pre-set cluster they are supposed to belong to, based on the signal we generate in the data.
+```{r}
+##SETUP CHUNK: INSTALLS AND LOADS NEEDED PACKAGES##
+
+#this installs pacman: using its p_load function you can load any package you want, and if you don't have it installed it will automatically download it for you.
+if(!require(pacman)) {
+install.packages("pacman"); require(pacman)}
+#load packages we want to use
+p_load(ggplot2, tidyverse, EBImage, stringr, devtools, R.matlab)
+
+#some packages are not on CRAN, so need to be downloaded manually
+install_github("vqv/ggbiplot")
+```
 
 
 ```{r}
@@ -29,29 +41,99 @@ yValues = purrr::pmap(list(nPoints, meanY, sds), rnorm)
 
 dataforClustering = as_tibble(list("Gene 1 Expression" = unlist(xValues),
                                     "Gene 2 Expression" = unlist(yValues),
-                                   "Cluster" = clusterIdentity))
+                                   "True Cluster" = as.factor(clusterIdentity)))
 
 
-ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "Cluster")) + geom_point(size = 3) +
-  theme_bw() +
+ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "`True Cluster`")) + geom_point(size = 3) +
+  theme_bw() 
   
   
 
 ```
-Now it is time to perform some clustering on this data. Run the code block below, and answer the questions.
+Now it is time to perform some clustering on this data. Run the code block below, and answer the questions. We perform k-means until convergence is reached (the centroids don't move anymore) for 4 different random initialisations of 4 clusters.
 
 
 ```{r}
 centersForRuns = vector("list", 4)
 
 for( i in seq_along(centersForRuns)) {
-  centersForRuns[[i]] = dataforClustering[sample(seq(1:nrow(dataforClustering)), 4), 1:2]
-  kMeans
+  centersForRuns[[i]] = dataforClustering[sample(seq(1:nrow(dataforClustering)), 4), ]
   }
 centersForRuns 
 
 
-kmeans(dataforClustering[, 1:2], 4)
+
+preClusterPlot   = function(data, centers) {
+  bgPlot = ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "`True Cluster`")) +
+  geom_point(size = 3) +
+  geom_point(size = 5, stroke = 2.5, shape = 21, data = centers, colour = "black",
+             aes_string(fill = "`True Cluster`"),
+             show.legend = FALSE) +
+  scale_fill_discrete(drop = FALSE) +
+  theme_bw()
+  bgPlot
+}
+firstClusterPlot = function(data, centers) {
+  
+dfCluster <- kmeans(data[, 1:2],centers=centersForRuns[[1]][, 1:2], iter.max = 1)
+centersForPlotting = dfCluster$centers %>% as_tibble() %>% add_column(centroid = as.factor(1:nrow(dfCluster$centers)))
+data$kMeansClusterIteration1 = as.character(dfCluster$cluster)
+firstIterationClusteringPlot = ggplot(data = data,
+       aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "kMeansClusterIteration1")) +
+  geom_point(size = 3) +
+  geom_point(size = 5, stroke = 2.5, shape = 21, data = centersForPlotting, colour = "black",
+             aes_string(fill = "centroid"),
+             show.legend = NA) +
+  theme_bw()
+  list(data = data, plot = firstIterationClusteringPlot)
+  
+  
+}
+iterationPlot = function(dataPoints, dataCenters, iteration) {
+  itPlot = ggplot(data = dataPoints,
+       aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`",
+                  colour = paste0("kMeansClusterIteration", iteration)
+                  )) +
+  geom_point(size = 3) +
+  geom_point(size = 5, stroke = 2.5, shape = 21, data = dataCenters, colour = "black",
+             aes_string(fill = "centroid"),
+             show.legend = NA) +
+  theme_bw()
+  itPlot
+  
+}
+
+
+beginPlot = preClusterPlot(data = dataforClustering, centers = centersForRuns[[1]])
+itOnePlot = firstClusterPlot(data = dataforClustering, centers = centersForRuns[[1]])
+show(beginPlot)
+show(itOnePlot[["plot"]])
+
+
+
+
+
+cent         = list(dfCluster$centers)
+max_iter = 10
+itPlotList = vector("list", length = max_iter)
+
+for (i in 2:max_iter){
+  tryCatch({
+    dfCluster <- kmeans(dataforClustering[, 1:2], centers = dfCluster$centers, iter.max = 1)
+    done <- TRUE
+  }, 
+  warning=function(w) {done <- FALSE})
+  cent[[i]] <- dfCluster$centers %>% as_tibble() %>% add_column(centroid = as.factor(1:nrow(dfCluster$centers)))
+  dataforClustering[[paste0("kMeansClusterIteration", i)]] = as.character(dfCluster$cluster)
+  itPlotList[[i]] = iterationPlot(dataforClustering, cent[[i]], i)
+  if(done) break
+}
+
+for (itPlot in itPlotList) {
+  show(itPlot)
+}
+
+
 ```
 
 
@@ -63,6 +145,32 @@ kmeans(dataforClustering[, 1:2], 4)
 
 
 
+```{r}
+#non-functionwrapped older code:
+  
+  #beginning situation
+beforeClustering = ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "`True Cluster`")) +
+  geom_point(size = 3) +
+  geom_point(size = 5, stroke = 2.5, shape = 21, data = centersForRuns[[1]], colour = "black",
+             aes_string(fill = "`True Cluster`"),
+             show.legend = FALSE) +
+  scale_fill_discrete(drop = FALSE) +
+  theme_bw()  
+show(beforeClustering)
+
+#iteration 1 of Kmeans
+dfCluster <- kmeans(dataforClustering[, 1:2],centers=centersForRuns[[1]][, 1:2], iter.max = 1)
+centersForPlotting = dfCluster$centers %>% as_tibble() %>% add_column(centroid = as.factor(1:nrow(dfCluster$centers)))
+dataforClustering$kMeansClusterIteration1 = as.character(dfCluster$cluster)
+firstIterationClustering = ggplot(data = dataforClustering,
+       aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "kMeansClusterIteration1")) +
+  geom_point(size = 3) +
+  geom_point(size = 5, stroke = 2.5, shape = 21, data = centersForPlotting, colour = "black",
+             aes_string(fill = "centroid"),
+             show.legend = NA) +
+  theme_bw()
+show(firstIterationClustering)
+```
 
 
 
@@ -122,14 +230,7 @@ You've learned about the importance of clustering and dimensionality reduction. 
 The question is: can we take pictures of human faces, run them through dimensionality reduction, and still keep most of the, well, face-ness intact? Start by running the code below to import images of faces (specifically, from here: http://vis-www.cs.umass.edu/lfw/ , and within that data only those people whose names start with a).
 
 ```{r}
-#this installs pacman: using its p_load function you can load any package you want, and if you don't have it installed it will automatically download it for you.
-if(!require(pacman)) {
-install.packages("pacman"); require(pacman)}
-#load packages we want to use
-p_load(ggplot2, tidyverse, EBImage, stringr, devtools, R.matlab)
 
-#some packages are not on CRAN, so need to be downloaded manually
-install_github("vqv/ggbiplot")
 
 #get the file names
 faceDir = "./Faces"
