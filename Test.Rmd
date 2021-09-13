@@ -67,43 +67,68 @@ centersForRuns
 #implement own k-means function
 data = dataforClustering[, 1:2]; startCentroids = centersForRuns[[1]][, 1:2]
 k = 4
-iterations = 10
+maxIterations = 10
 distance = "euclidean"
-#doKMeans = function(data, startCentroids, k = 4, iterations = 10, distance = "euclidean") {
-  centroidList = vector("list", iterations)
-  clusterList  = vector("list", iterations)
+stopThreshold = 0.001
+doKMeans = function(data, startCentroids, k = 4, maxIterations = 10, distance = "euclidean", stopThreshold = 0.001) {
+  centroidList = vector("list", maxIterations)
+  clusterMembershipList  = vector("list", maxIterations)
   currentCentroids = startCentroids
   
-  for (i in seq(1:iterations)) {
+  dimensions = ncol(data)
+  dataWithClusterAssignmentPerIteration = data
+  
+  for (i in seq(1:maxIterations)) {
     
     
     
     distancesList = vector("list", length = k)
     for (clusterKDistance in seq(1:k)) { 
       
+      
+      distVec = numeric(length = nrow(data))
       if (distance == 'euclidean') {
         
-        distVec = (data - currentCentroids[clusterKDistance, ])^2
+        for (row in seq(1:nrow(data))) {
+          distThisRow  = rowSums((data[row, ] - currentCentroids[clusterKDistance, ])^2)
+          distVec[row] = distThisRow
+        }
         
       }
       
       distancesList[[clusterKDistance]] = distVec
       
-      }
-    m = bind_cols(distancesList)
-    break
+    }
+    #assign all points to the centroid they are closest to and save this assignment in a list
+    distancesToAllCentroids = dplyr::bind_cols(distancesList)
+    clusterAssignment       = apply(distancesToAllCentroids, 1, which.min)
+    dataWithClusterAssignmentPerIteration[[paste0("clusterMembershipIteration", i)]] = factor(clusterAssignment, levels = as.character(seq(1:k)))
+    clusterMembershipList[[i]] = clusterAssignment
     
+    #recalculate the cluster centroids and save this assignment in a list
+    newCentroids = dataWithClusterAssignmentPerIteration %>%
+      group_by(across(all_of(paste0("clusterMembershipIteration", i)))) %>%
+                 summarize(across(.cols = 1:dimensions, mean))
+    currentCentroids = newCentroids[, 2:(dimensions+1)]
+    centroidList[[i]] = currentCentroids  
     
-    
-    newCentroids = data %>% group_by(currentCluster) %>% mean()
-    currentCentroids = newCentroids
+    #check for convergence. If total difference between centroid coordinates between iterations is
+    #below certain threshold, stop.
+    if (i > 1) {
       
-    
-    
+      differenceInCentroidsBetweenIterations = abs(sum(centroidList[[i]] - centroidList[[i-1]]))
+      
+      if(differenceInCentroidsBetweenIterations < stopThreshold) {
+        break
+      }
+      
+    }
     
     
   }
-  
+  list(dataPointAssignedClusters = purrr::compact(clusterMembershipList),
+       clusterCentroidPositions  = purrr::compact(centroidList),
+       dataAllClusterAssignment  = dataWithClusterAssignmentPerIteration)
  
   
 }
