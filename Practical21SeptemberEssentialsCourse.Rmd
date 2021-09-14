@@ -21,10 +21,13 @@ We'll start by performing some K-means clustering. The code block below generate
 if(!require(pacman)) {
 install.packages("pacman"); require(pacman)}
 #load packages we want to use
-p_load(ggplot2, magrittr, tidyverse, EBImage, stringr, devtools, R.matlab, gganimate, png, gifski)
+p_load(ggplot2, magrittr, plyr, tidyverse, EBImage, stringr, devtools, R.matlab, gganimate, png, gifski)
 
 #some packages are not on CRAN, so need to be downloaded manually
 install_github("vqv/ggbiplot")
+
+#options(dplyr.summarise.inform = FALSE)
+
 ```
 
 
@@ -54,20 +57,12 @@ Now it is time to perform some clustering on this data. Run the code block below
 
 
 ```{r}
-centersForRuns = vector("list", 4)
 
-for( i in seq_along(centersForRuns)) {
-  centersForRuns[[i]] = dataforClustering[sample(seq(1:nrow(dataforClustering)), 4), ]
-  }
-centersForRuns 
-
+#####
+## TO DO: PORT THESE FUNCTIONS TO ANOTHER FILE AND LOAD THAT IN, RATHER THAN HAVING THEM HERE?
+####
 
 #implement own k-means function
-data = dataforClustering[, 1:2]; startCentroids = centersForRuns[[1]][, 1:2]
-k = 4
-maxIterations = 10
-distance = "euclidean"
-stopThreshold = 0.001
 doKMeans = function(data, startCentroids, k = 4, maxIterations = 10, distance = "euclidean", stopThreshold = 0.001) {
   centroidList = vector("list", (maxIterations+1))
   clusterMembershipList  = vector("list", (maxIterations+1))
@@ -145,14 +140,8 @@ doKMeans = function(data, startCentroids, k = 4, maxIterations = 10, distance = 
   
 }
 
-kMeansOutcomes = vector("list", length = length(centersForRuns))
-for(randomCentroidInitialisationNr in seq_along(centersForRuns)) {
-  kMeansOutcomes[[randomCentroidInitialisationNr]] = doKMeans(dataforClustering[, 1:2],
-                                                              centersForRuns[[randomCentroidInitialisationNr]][, 1:2])
-}
 
-
-
+#plot initial situation + true cluster membership
 preClusterPlot   = function(data, centers) {
   bgPlot = ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "`True Cluster`")) +
   geom_point(size = 3) +
@@ -160,10 +149,12 @@ preClusterPlot   = function(data, centers) {
              aes_string(fill = "`True Cluster`"),
              show.legend = FALSE) +
   scale_fill_discrete(drop = FALSE) +
-  theme_bw()
+  theme_bw() +
+    ggtitle("True underlying data and starting centroids")
   bgPlot
 }
 
+#plot the cluster membership and centroids for each iteration of k-means
 iterationPlot = function(dataPoints, dataCenters) {
   
   #make plots according to number of iterations in data
@@ -181,25 +172,14 @@ iterationPlot = function(dataPoints, dataCenters) {
   geom_point(size = 5, stroke = 2.5, shape = 21, data = dataWithCentroidIdentity, colour = "black",
              aes_string(fill = "Centroid"),
              show.legend = NA) +
-  theme_bw()
+  theme_bw() +
+      ggtitle(paste0("iteration: ", plotNr))
   itPlotList[[plotNr]] = itPlot
     
   }
   
   itPlotList
 }
-
-
-#beginPlot = preClusterPlot(data = dataforClustering, centers = centersForRuns[[1]])
-#itOnePlot = firstClusterPlot(data = dataforClustering, centers = centersForRuns[[1]])
-#show(beginPlot)
-#show(itOnePlot)
-
-beginPlot = preClusterPlot(data = dataforClustering, centers = centersForRuns[[1]])
-show(beginPlot)
-iterationPlots = iterationPlot(dataPoints  = kMeansOutcomes[[1]]$dataAllClusterAssignment,
-                               dataCenters = kMeansOutcomes[[1]]$clusterCentroidPositions)
-
 
 #make it animated
 iterationPlotAnim = function(dataPoints, dataCenters) {
@@ -215,7 +195,7 @@ iterationPlotAnim = function(dataPoints, dataCenters) {
   
   #reshape centroids for animation
   centroidFrame           = dplyr::bind_rows(dataCenters)
-  centroidFrame$iteration = as.factor(rep(seq(0:(nIterations-1)), each = nrow(dataCenters[[1]])))
+  centroidFrame$iteration = as.factor(rep((seq(1:(nIterations))-1), each = nrow(dataCenters[[1]])))
   centroidFrame$centroid  = as.factor(rep(seq(1:nrow(dataCenters[[1]])), (nIterations) ))
 
     
@@ -229,108 +209,192 @@ iterationPlotAnim = function(dataPoints, dataCenters) {
              show.legend = NA) +
   theme_bw() +
       transition_manual(`iteration`) +
-      ease_aes()
+      ease_aes() +
+      labs(title = "Iteration: {current_frame}")
   itPlot
 }
 
-dataPoints = kMeansOutcomes[[1]]$dataAllClusterAssignment
-dataCenters = kMeansOutcomes[[1]]$clusterCentroidPositions
+#start with randomStarts random initialisations, picking k random centroids from the data each time
+getKRandomStartPoints = function(data, k = 4, randomStarts = 4) {
+  
+  centersForRuns = vector("list", randomStarts)
 
-flak = iterationPlotAnim(dataPoints  = kMeansOutcomes[[1]]$dataAllClusterAssignment,
-                               dataCenters = kMeansOutcomes[[1]]$clusterCentroidPositions)
+for( i in seq_along(centersForRuns)) {
+  centersForRuns[[i]] = data[sample(seq(1:nrow(data)), k), ]
+}
+  centersForRuns
+  
+}
 
-animate(flak, nframes = length(unique(flak$data)) * 15)
+#calculate kMeans clustering steps for each random initialisation, output in list
+#note: in this form, function won't work for multi-dim data
+calculateKMeansTrajectoryEachRandomInit = function(data = dataforClustering, initialCentroids = centersForRuns) {
+  
+  kMeansOutcomes = vector("list", length = length(initialCentroids))
+  for(randomCentroidInitialisationNr in seq_along(initialCentroids)) {
+    kMeansOutcomes[[randomCentroidInitialisationNr]] = doKMeans(data[, 1:2],
+                                                              initialCentroids[[randomCentroidInitialisationNr]][, 1:2])
+  }
+  kMeansOutcomes
+}
 
+#generate plots and animations using the plotting and animating function defined above
+makePlotsAndAnimation = function(kMeansOutcomeData = kMeansOutcomes) {
+  
+  animationList = vector("list", length(kMeansOutcomeData))
+  totalPlotList = vector("list", length(kMeansOutcomeData))
+  for(i in seq_along(kMeansOutcomeData)) {
+  
+    beginPlot      = preClusterPlot(data = dataforClustering, centers = centersForRuns[[i]])
+    iterationPlots = iterationPlot(dataPoints  = kMeansOutcomeData[[i]]$dataAllClusterAssignment,
+                               dataCenters = kMeansOutcomeData[[i]]$clusterCentroidPositions)
+    animationPlot  = iterationPlotAnim(dataPoints  = kMeansOutcomeData[[i]]$dataAllClusterAssignment,
+                                dataCenters = kMeansOutcomeData[[i]]$clusterCentroidPositions)
+    totalPlotList[[i]] = list(beginPlot)
+    totalPlotList[[i]] = append(totalPlotList[[i]], iterationPlots)
+    animationList[[i]] = animationPlot
+  
+  }
+  
+  return(list(plots = totalPlotList, animations = animationList))
+  
+}
 
-# cent         = list(dfCluster$centers)
-# max_iter = 10
-# itPlotList = vector("list", length = max_iter)
-# 
-# for (i in 2:max_iter){
-#   tryCatch({
-#     dfCluster <- kmeans(dataforClustering[, 1:2], centers = dfCluster$centers, iter.max = 1, algorithm = "MacQueen")
-#     done <- TRUE
-#   }, 
-#   warning=function(w) {done <- FALSE})
-#   cent[[i]] <- dfCluster$centers %>% as_tibble() %>% add_column(centroid = as.factor(1:nrow(dfCluster$centers)))
-#   dataforClustering[[paste0("kMeansClusterIteration", i)]] = as.character(dfCluster$cluster)
-#   itPlotList[[i]] = iterationPlot(dataforClustering, cent[[i]], i)
-#   if(done) break
-# }
-# 
-# totalPlotListThisRun = list(beginPlot, itOnePlot)
-# totalPlotListThisRun[3:(length(itPlotList)+3)] = itPlotList
+centersForRuns = getKRandomStartPoints(data = dataforClustering, k = 4, randomStarts = 4)
 
+kMeansOutcomes = calculateKMeansTrajectoryEachRandomInit(data = dataforClustering,
+                                                         initialCentroids = centersForRuns)
+
+plotsAndAnimations = makePlotsAndAnimation()
 
 ```
 
+```{r}
+#random initialisation 1 and 2
+plotsAndAnimations$plots[[1]]
+print("---")
+plotsAndAnimations$plots[[2]]
+```
 
 
+```{r}
+#random initialisation 3 and 4
+plotsAndAnimations$plots[[3]]
+print("---")
+plotsAndAnimations$plots[[4]]
+```
 
+```{r}
+#animations --> change the number to see a different one
+plotsAndAnimations$animations[[2]]
+```
 
+Q1: Look at the clusters produced. How many get, or almost get, the 'real' clustering that produced the data?
 
+#Answer: this depends on your random initialisation, which we haven't set to a certain seed on purpose to keep things interesting and different for discussion. About 2 converged on 4 clusters in our case.
+
+Q2: In the cases where a 'wrong' clustering was obtained, what caused this?
+
+#Answer: in general what will happen is that a cluster centroid gets 'stuck' behind another. For example, if three centroids are, at random, initialised in the same real cluster, then it happens that 1 centroid covers two clusters, clusters, while the others divvy up the remaining points between them. This is exactly why you need multiple initialisations!
+
+Q3: We actually cheated here, in the sense that we know the underlying data structure, and adapted our k to it (4). In reality, we wouldn't know this (although in this 2D data, we could use our visual system!). Try k-values from 2 to 8, and see what sort of clusters you get. Use the code chunk below and the functions defined above. Feel free to make extra code blocks as needed. What do you see?
 
 
 
 
 ```{r}
-#non-functionwrapped older code:
-  
-  #beginning situation
-beforeClustering = ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "`True Cluster`")) +
-  geom_point(size = 3) +
-  geom_point(size = 5, stroke = 2.5, shape = 21, data = centersForRuns[[1]], colour = "black",
-             aes_string(fill = "`True Cluster`"),
-             show.legend = FALSE) +
-  scale_fill_discrete(drop = FALSE) +
-  theme_bw()  
-show(beforeClustering)
+#Use these functions:
+centersForRunsKTwo = getKRandomStartPoints(data = dataforClustering, k = 2, randomStarts = 4)
 
-#iteration 1 of Kmeans
-dfCluster <- kmeans(dataforClustering[, 1:2],centers=centersForRuns[[1]][, 1:2], iter.max = 1)
-centersForPlotting = dfCluster$centers %>% as_tibble() %>% add_column(centroid = as.factor(1:nrow(dfCluster$centers)))
-dataforClustering$kMeansClusterIteration1 = as.character(dfCluster$cluster)
-firstIterationClustering = ggplot(data = dataforClustering,
-       aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "kMeansClusterIteration1")) +
-  geom_point(size = 3) +
-  geom_point(size = 5, stroke = 2.5, shape = 21, data = centersForPlotting, colour = "black",
-             aes_string(fill = "centroid"),
-             show.legend = NA) +
-  theme_bw()
-show(firstIterationClustering)
+kMeansOutcomesKTwo = calculateKMeansTrajectoryEachRandomInit(data = dataforClustering,
+                                                         initialCentroids = centersForRunsKTwo)
+
+plotsAndAnimationsKTwo = makePlotsAndAnimation(kMeansOutcomeData = kMeansOutcomesKTwo)
 
 
+```
 
 
+Q4: having seen this diversity, try to think of a way you could try to quantify how good a given k-means clustering is. Think about how well each point in a cluster 'fits' or belongs to that cluster versus how well-separated the clusters are (how far the centroids are away from each other).
+
+#Answer: What you'd want to do is do exactly what we discussed in the lecture: make sure that points in a cluster have a low spread, while there is a relatively larger spread between the clusters. That is: you want a cluster to be a tight spread of points, and ideally to be far away from any other cluster. 
+
+Q5: What would the optimal number of clusters be for n datapoints if you only want to minimise the distance from a point to the centroid of the cluster it belongs to? Is this useful?
+
+#Answer: That would be k=n, in other words: then you're not clustering. In this case, the distance from each point to its centroid is 0. That's perfect, but useless.
+
+We've talked during the lecture about problems in higher dimensions. You can cluster in higher dimensions and then project this high-dimensional data down to 2D for plotting, plotting the clusters as well. We've covered, however, that once the number of dimensions gets large, distance metrics lose their meaning.
+
+Before we move into showing that outright, let's add noisy genes to our data, reduce the dimensions with PCA, and plot the 2D plot. Answer the questions under the code block.
+
+```{r}
+#Here we will set the seed so things are equal, so you can discuss with your neighbours!
+set.seed(424242)
 
 
+#plot of original data
+ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "`True Cluster`")) + geom_point(size = 3) +
+  theme_bw() 
 
 
+#just the 2D data, showing that PCA does nothing if you keep the initialdata
+pca2DData = prcomp(dataforClustering %>% select(-"True Cluster"), center = TRUE, scale. = TRUE)
+
+#plot it
+ggbiplot::ggbiplot(pca2DData, groups = dataWithNoise$`True Cluster`) + theme_bw()
+
+#add noise to our data
+dataWithNoise = dataforClustering
+dataWithNoise[["Gene 3 Expression"]] = runif(nrow(dataWithNoise), 0, 8)
+
+#perform PCA
+pca3DData = prcomp(dataWithNoise %>% select(-"True Cluster"), center = TRUE, scale. = TRUE)
+
+#plot data
+ggbiplot::ggbiplot(pca3DData, groups = dataWithNoise$`True Cluster`) + theme_bw()
 
 
+#add another dimension with noise and do this again
+dataWithNoise[["Gene 4 Expression"]] = runif(nrow(dataWithNoise), 0, 8)
 
-firstClusterPlot = function(data, centers) {
-  
-dfCluster <- kmeans(data[, 1:2],centers=centers[, 1:2], iter.max = 1, algorithm = "MacQueen")
-centersForPlotting = dfCluster$centers %>% as_tibble() %>% add_column(centroid = as.factor(1:nrow(dfCluster$centers)))
-dataforClustering$kMeansClusterIteration1 = as.character(dfCluster$cluster)
-firstIterationClusteringPlot = ggplot(data = data,
-       aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`", colour = "kMeansClusterIteration1")) +
-  geom_point(size = 3) +
-  geom_point(size = 5, stroke = 2.5, shape = 21, data = centersForPlotting, colour = "black",
-             aes_string(fill = "centroid"),
-             show.legend = NA) +
-  theme_bw()
-  firstIterationClusteringPlot
-  
-  
-}
+pca4DData = prcomp(dataWithNoise %>% select(-"True Cluster"), center = TRUE, scale. = TRUE)
+
+ggbiplot::ggbiplot(pca4DData, groups = dataWithNoise$`True Cluster`, varname.adjust = 0.2) + theme_bw()
+
 
 
 
 ```
 
 
+Q6: What has happened in the first PCA plot, where we 'reduce' dimensions from 2 to 2? What do the arrows mean?
+
+Q7: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Now let's add more noisy dimensions and see what happens with clustering. We'll take our data from above, and just start adding random noisy genes. Then we'll do PCA and visualise the first 2 components each time. 
 
 
 
@@ -379,6 +443,8 @@ firstIterationClusteringPlot = ggplot(data = data,
 
 
 
+___________________________________________________________________________________________________________
+___________________________________________________________________________________________________________
 
 
 
