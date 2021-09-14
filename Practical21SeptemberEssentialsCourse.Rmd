@@ -9,6 +9,17 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+#####
+##
+## FIRST: Download RTools
+#Windows: https://cran.r-project.org/bin/windows/Rtools/ , read there and see: https://jtleek.com/modules/01_DataScientistToolbox/02_10_rtools/#1 
+#Mac: https://github.com/rmacoslib/r-macos-rtools 
+#Linux: don't know exactly, run the chunk below installing things and see how it goes, we'll troubleshoot errors
+##
+#####
+
+
+
 #unsupervised learning day 1
 
 #part 1: clustering
@@ -341,7 +352,7 @@ ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gen
 pca2DData = prcomp(dataforClustering %>% select(-"True Cluster"), center = TRUE, scale. = TRUE)
 
 #plot it
-ggbiplot::ggbiplot(pca2DData, groups = dataWithNoise$`True Cluster`) + theme_bw()
+ggbiplot::ggbiplot(pca2DData, groups = dataWithNoise$`True Cluster`, varname.adjust = 1.1, varname.abbrev = TRUE) + theme_bw()
 
 #add noise to our data
 dataWithNoise = dataforClustering
@@ -351,7 +362,7 @@ dataWithNoise[["Gene 3 Expression"]] = runif(nrow(dataWithNoise), 0, 8)
 pca3DData = prcomp(dataWithNoise %>% select(-"True Cluster"), center = TRUE, scale. = TRUE)
 
 #plot data
-ggbiplot::ggbiplot(pca3DData, groups = dataWithNoise$`True Cluster`) + theme_bw()
+ggbiplot::ggbiplot(pca3DData, groups = dataWithNoise$`True Cluster`, varname.adjust = 1.1, varname.abbrev = TRUE) + theme_bw()
 
 
 #add another dimension with noise and do this again
@@ -359,17 +370,100 @@ dataWithNoise[["Gene 4 Expression"]] = runif(nrow(dataWithNoise), 0, 8)
 
 pca4DData = prcomp(dataWithNoise %>% select(-"True Cluster"), center = TRUE, scale. = TRUE)
 
-ggbiplot::ggbiplot(pca4DData, groups = dataWithNoise$`True Cluster`, varname.adjust = 0.2) + theme_bw()
+ggbiplot::ggbiplot(pca4DData, groups = dataWithNoise$`True Cluster`, varname.adjust = 1.1, varname.abbrev = TRUE) + theme_bw()
 
+#Once more because it's cool
+dataWithNoise[["Gene 5 Expression"]] = runif(nrow(dataWithNoise), 0, 8)
 
+pca5DData = prcomp(dataWithNoise %>% select(-"True Cluster"), center = TRUE, scale. = TRUE)
 
+ggbiplot::ggbiplot(pca5DData, groups = dataWithNoise$`True Cluster`, varname.adjust = 1.1, varname.abbrev = TRUE) + theme_bw()
 
 ```
 
 
 Q6: What has happened in the first PCA plot, where we 'reduce' dimensions from 2 to 2? What do the arrows mean?
 
-Q7: 
+#Answer: the data has been rotated, but is otherwise unperturbed. The arrows are the 2D projections of the original variable axes in the new space. In this case, they just correspond to the x- and y-axis in the original plot.
+
+Q7: What happens to the clusters (as we predefined them) when we add more noise? Why?
+
+#Answer: they become less and less well-defined in the dimension reduction, because more and more of the variance in the data is due to the noisy variables we added. The points start to become more like each other in noisy dimensions rather than in the 2 dimensions with signal that we predefined (the 4 groups in expression in gene 1 and 2).
+
+Q8: in the code block below, run ggbiplot::ggscreeplot() on the output of the different PCAs. How many components do you need in each case to get >~ 80% of the variability in the data?
+
+#answer: first one, 2. Second one: 3, fourth one: 3, fifth one: 4
+
+```{r}
+
+```
+
+
+
+
+Now, let's run kmeans on the multidimensional data, and then show the groups found in the 2D space. Note that R's k-means function automatically does multiple initialisations and chooses the 'best' clusters (it is smarter than the basic k-means explained in the lectures). Below is the example for k = 4. 
+
+Run this procedure also for the 4D and 5D data. So:
+-select the columns you need
+-perform k-means
+-plot a ggbiplot where you colour the actual clusters ("True Cluster" column)
+-plot a ggbiplot where you colour the clusters k-means found 
+
+
+```{r}
+k = 4
+kMeans2D = kmeans(dataforClustering %>% select(-"True Cluster"), centers = k)
+
+
+#plot 2D plot with actual clusters
+ggplot(dataforClustering %>% mutate(kMeansCluster = as.factor(kMeans2D$cluster)),
+       aes( x = `Gene 1 Expression`, y = `Gene 2 Expression`, colour = `True Cluster`)) +
+  geom_point() + 
+  theme_bw() +
+  ggtitle("Actual clusters")
+
+#plot 2D plot with k-means clusters
+ggplot(dataforClustering %>% mutate(kMeansCluster = as.factor(kMeans2D$cluster)),
+       aes( x = `Gene 1 Expression`, y = `Gene 2 Expression`, colour = kMeansCluster)) +
+  geom_point() + 
+  theme_bw() +
+  ggtitle("K-means clusters")
+
+
+#plot PCA plot with actual clusters
+ggbiplot::ggbiplot(pca2DData, groups = as.factor(dataforClustering$`True Cluster`), varname.adjust = 1.1, varname.abbrev = TRUE) + theme_bw() +
+  ggtitle("Actual clusters PCA")
+
+#plot PCA plot with k-means cluster
+ggbiplot::ggbiplot(pca2DData, groups = as.factor(kMeans2D$cluster), varname.adjust = 1.1, varname.abbrev = TRUE) + theme_bw() +
+  ggtitle("K-means clusters PCA")
+
+
+#################################################
+##
+##          UP TO YOU FROM HERE!
+##
+#################################################
+
+
+#functions you need. If you don't understand how to use them, execute ?FUNCTION_NAME in the console, or search online!
+
+columnsToKeep = c("Gene 1 Expression", "Gene 2 Expression", "Gene 3 Expression", "Gene 4 Expression")
+dataWithNoise %>% select(contains(columnsToKeep)) 
+?kmeans()
+
+
+
+####
+##
+## ANSWER
+##
+####
+
+
+
+```
+
 
 
 
