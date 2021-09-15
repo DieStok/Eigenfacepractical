@@ -29,10 +29,12 @@ We'll start by performing some K-means clustering. The code block below generate
 ##SETUP CHUNK: INSTALLS AND LOADS NEEDED PACKAGES##
 
 #this installs pacman: using its p_load function you can load any package you want, and if you don't have it installed it will automatically download it for you.
+if(!require(BiocManager)) {
+install.packages("BiocManager"); require(BiocManager)}
 if(!require(pacman)) {
 install.packages("pacman"); require(pacman)}
 #load packages we want to use
-p_load(ggplot2, magrittr, plyr, tidyverse, EBImage, stringr, devtools, R.matlab, gganimate, png, gifski)
+p_load(ggplot2, magrittr, plyr, tidyverse, EBImage, stringr, devtools, R.matlab, gganimate, png, gifski, knitr)
 
 #some packages are not on CRAN, so need to be downloaded manually
 install_github("vqv/ggbiplot")
@@ -348,11 +350,11 @@ ggplot(data = dataforClustering, aes_string(x = "`Gene 1 Expression`", y = "`Gen
   theme_bw() 
 
 
-#just the 2D data, showing that PCA does nothing if you keep the initialdata
+#just the 2D data
 pca2DData = prcomp(dataforClustering %>% select(-"True Cluster"), center = TRUE, scale. = TRUE)
 
 #plot it
-ggbiplot::ggbiplot(pca2DData, groups = dataWithNoise$`True Cluster`, varname.adjust = 1.1, varname.abbrev = TRUE) + theme_bw()
+ggbiplot::ggbiplot(pca2DData, groups = dataforClustering$`True Cluster`, varname.adjust = 1.1, varname.abbrev = TRUE) + theme_bw()
 
 #add noise to our data
 dataWithNoise = dataforClustering
@@ -401,7 +403,7 @@ Q8: in the code block below, run ggbiplot::ggscreeplot() on the output of the di
 
 
 
-Now, let's run kmeans on the multidimensional data, and then show the groups found in the 2D space. Note that R's k-means function automatically does multiple initialisations and chooses the 'best' clusters (it is smarter than the basic k-means explained in the lectures). Below is the example for k = 4. 
+Now, let's run kmeans on the multidimensional data, and then show the groups found in the 2D space. Note that R's k-means function automatically does multiple initialisations and chooses the 'best' clusters (it is smarter than the basic k-means explained in the lectures) 
 
 Run this procedure also for the 4D and 5D data. So:
 -select the columns you need
@@ -409,6 +411,7 @@ Run this procedure also for the 4D and 5D data. So:
 -plot a ggbiplot where you colour the actual clusters ("True Cluster" column)
 -plot a ggbiplot where you colour the clusters k-means found 
 
+Below is the example for the 2D data. You must do it for the 4D and 5D data!
 
 ```{r}
 k = 4
@@ -460,46 +463,153 @@ dataWithNoise %>% select(contains(columnsToKeep))
 ##
 ####
 
+keepUntil = c(4,5)
+listPCAResults = list(`4` = pca4DData, `5` = pca5DData)
+for (i in seq_along(keepUntil)) {
+  
+  columnsToKeep = paste0("Gene ", seq(1,keepUntil[i]), " Expression")
+  dataND        = dataWithNoise %>% select(contains(columnsToKeep)) 
+  kMeansND      = kmeans(dataND, centers = k)
+  
+  
+  #plot PCA plot with actual clusters
+  realClusterPlot = ggbiplot::ggbiplot(listPCAResults[[as.character(keepUntil[i])]], groups = as.factor(dataforClustering$`True Cluster`), varname.adjust = 1.1, varname.abbrev = TRUE) +
+    theme_bw() +
+  ggtitle("Actual clusters PCA")
+
+#plot PCA plot with k-means cluster
+  kMeansPlot = ggbiplot::ggbiplot(listPCAResults[[as.character(keepUntil[i])]],
+                                  groups = factor(kMeansND$cluster, levels = c(1,2,3,4)), varname.adjust = 1.1, varname.abbrev = TRUE) +
+    theme_bw() +
+  ggtitle("K-means clusters PCA")
+  show(realClusterPlot)
+  show(kMeansPlot)
+  
+}
+
+
+
 
 
 ```
 
+Q9: What do you see? Do the clusters still resemble the 'actual clusters' that we put in?
+
+#Answer: yes, for these uniform noise dimensions which were added, the clusters are still exactly the same as we defined them. K-means isn't disturbed by the noise so far.
+
+  
+
+Now let's add more noisy dimensions and see what happens with clustering. We'll take our data from above, and just start adding more and more random noisy genes. Then we'll do PCA and visualise the first 2 components each time. I say 'we', but it's going to be you. So:
+
+-Add 10, 20, 50, 100 and 200 noise dimensions (save each as a different dataframe)
+-Perform pca on each dataframe (use prcomp(data, center = TRUE, scale. = TRUE ))
+-Perform kmeans clustering on each dataframe (use R's kmeans() function), use k = 4
+-Plot the 2 first principal components (use ggbiplot::ggbiplot(), like above), once colouring the groups by the predefined signal (Gene 1 and Gene 2), and once colouring them by the clusters that k-means arrives at.
+
+--> Feel free to use a loop, but also feel free not to use loops!
+--> If not using loops, it's fine if you just do 2 or 3 cases (20, 50, 200 noise dimensions)
+--> You can check the code blocks above for the type of thing you need to do here (it uses similar functions and data editing techniques)
+--> If you get stuck, feel free to check the answers.
 
 
+```{r}
+#functions you might want to use/example of adding random noise
+exampleData     = tibble(`Gene 1 Expression` = c(1,2,3),`Gene 2 Expression` = c(4,5,6))
+colsToAdd       = 5
+randData        = purrr::map(rep(nrow(exampleData), colsToAdd), runif, 0, 8)
+newNames        = paste0("Gene ", seq(3,(colsToAdd+2)), " Expression")
+names(randData) = newNames
+newNoiseCols    = dplyr::bind_cols(randData)
+addedNoiseData  = bind_cols(exampleData, newNoiseCols)
+
+#if you want to drop columns:
+noGeneFive      = addedNoiseData %>% select(-contains("Gene 5"))
+
+#remember that the data is in
+dataforClustering
+
+#######################################
+###
+###   UP TO YOU FROM HERE ON OUT!
+###
+#######################################
+
+########
+#Answer#
+########
 
 
+#make some empty lists, and a vector of dimensions to add to loop over
+noiseDimsToAdd  = c(10, 20, 50, 100, 200, 1000)
+dataList        = vector("list", length(noiseDimsToAdd))
+pcaDataList     = vector("list", length(noiseDimsToAdd))
+kMeansList      = vector("list", length(noiseDimsToAdd))
+plotList        = vector("list", length(noiseDimsToAdd))
+for (i in seq_along(noiseDimsToAdd)) {
+  
+  #add random data
+  colsToAdd        = noiseDimsToAdd[i]
+  randData         = purrr::map(rep(nrow(dataforClustering), colsToAdd), rnorm)
+  #randData         = purrr::map(rep(nrow(dataforClustering), colsToAdd),
+  #rnorm, sample(seq(0, 8), 1), sample(seq(0, 5), 1))
+  newNames         = paste0("Gene ", seq(3,(colsToAdd+2)), " Expression")
+  names(randData)  = newNames
+  newNoiseCols     = dplyr::bind_cols(randData)
+  addedNoiseData   = bind_cols(dataforClustering, newNoiseCols)
+  
+  dataList[[i]]    = addedNoiseData
+  
+  #do pca
+  pcaThisData      = prcomp(addedNoiseData %>% select(-contains("True Cluster")),
+                           center = TRUE, scale. = TRUE )
+  
+  pcaDataList[[i]] = pcaThisData
+  
+  #run kmeans
+  kMeansThisData   = kmeans(addedNoiseData %>% select(-contains("True Cluster")), centers = 4)
+  
+  kMeansList[[i]]  = kMeansThisData
+  
+  #make plots
+  plotTrueCluster   = ggbiplot::ggbiplot(pcaThisData, groups = as.factor(dataforClustering$`True Cluster`), varname.adjust = 1.1, varname.abbrev = TRUE, var.axes = ifelse(noiseDimsToAdd[i]<100, TRUE, FALSE)) +
+    theme_bw() +
+  ggtitle(paste0("Actual clusters PCA with ", noiseDimsToAdd[i], " noise dimensions"))
+  
+  plotKMeansCluster = ggbiplot::ggbiplot(pcaThisData, groups = as.factor(kMeansThisData$cluster), varname.adjust = 1.1, varname.abbrev = TRUE, var.axes = ifelse(noiseDimsToAdd[i]<100, TRUE, FALSE)) +
+    theme_bw() +
+  ggtitle(paste0("K-means clusters PCA with ", noiseDimsToAdd[i], " noise dimensions"))
+  
+  plotList[[i]] = list(trueSignalClusters = plotTrueCluster,
+                       kMeansClusters     = plotKMeansCluster)
+}
 
 
+show(plotList)
+
+```
 
 
+Q10: What do you see as noise increases? Try to focus on a group of points and see how they shift colour when you jump between the 'true' clusters (that is, based on the signal we explicitly put in) and the ones k-means finds.
+
+#Answer: Though it is somewhat hard to see, in the beginning the clusters are still the same, even though with more dimensions the 2D plot is looking less and less like actual defined clusters. Once we get to 100 or 200 noise dimensions, they are not the same anymore.
+
+Q11: Contrast the PCAs of the high-dimensional space with those we made before when adding only 1 or 2 noise dimensions. Why are the points so much more spread out?
+
+#Answer: in actuality, every point is so noisy that everything is just far apart from each other in the 200D space. With 200 noise values, the signal is tiny compared to the part that random noise adds to the distance calculations.
+
+Q12: It might seem contrived that we are straight-up adding noise. Of course that would make clustering perform worse, we are diluting the signal by a factor 100 in the end! However, it is not so far off from reality. What biological experiments can you think up that might have similar problems?
+
+#Answer: any experiment where we measure expression of all/many genes, be it in RNA, at the protein level will have this problem: only a small part of the genes will be involved. Also when we measure cell-wide chromatin states, or many phenotypic characteristics in different growth conditions: there is little signal, and a lot of noise. Clustering works to find some patterns, but it's always a dialogue where you need to see what that structure might correspond to, etc.
 
 
+#####
+##
+## I DON'T YET KNOW WHETHER I REALLY THINK THE 200-D PLOT SHOWS WHAT I WANT IT TO SHOW, NAMELY THAT MORE AND MORE NOISE MAKES K-MEANS MORE AND MORE PRECARIOUS! FOR ME, SEEMS LIKE IT STILL WORKS WELL EVEN WITH 200 OR 1000 NOISE DIMENSIONS. WHAT GIVES!?
+##
+#####
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-Now let's add more noisy dimensions and see what happens with clustering. We'll take our data from above, and just start adding random noisy genes. Then we'll do PCA and visualise the first 2 components each time. 
-
-
-
-
-
-
-
-
-
-
-
+#something about hierarchical clustering
 
 
 
@@ -543,7 +653,7 @@ ________________________________________________________________________________
 
 
 #part 2 eigenface introduction to PCA
-You've learned about the importance of clustering and dimensionality reduction. Let's put them into practice. Before we dive into a biological example, let's use something that our brains are especially well-wired to interpret and think about: faces.
+Now, let's use something that our brains are especially well-wired to interpret and think about: faces.
 
 The question is: can we take pictures of human faces, run them through dimensionality reduction, and still keep most of the, well, face-ness intact? Start by running the code below to import images of faces (specifically, from here: http://vis-www.cs.umass.edu/lfw/ , and within that data only those people whose names start with a).
 
@@ -671,9 +781,19 @@ hist(tableNames)
 Now that you've gotten to know the data some, let's do what we set out to do. First, let's think about the dimensionality of the input space. You can use the code block below to answer these questions.
 
 Q5: What do the numbers printed in the matrix signify? 
+
+#Answer: grayscale values, from 0-1 (actual pixel intensity is normally from 0-255)
 Q6: What is the dimension of the input space?
-Q7: Do you think that this n*n-dimensional space is evenly (or randomly) filled with examples from this data, or not? Why? #PERHAPS MAKE HERE A RANDOM GRAYSCALE IMAGE. 
+#Answer 250*250 = 62500-dimensional
+Q7: Do you think that this n*n-dimensional space is evenly (or randomly) filled with examples from this data, or not? In other words: in all the values that data in this n.n-dimensional space could take, how special are faces? Why?
+#Answer: In this dimensionality, we can represent images of wasps, chickens, buildings, galaxies, UFOs, and what have you. It is a huge possibility space. If we think about this huge space, it makes sense that faces are a very special case within all the possible values. Another way of conceptualising this is thinking about a random point in such a space: an image of random values between 0-1 for each pixel will look nothing like a face at all. Hence, nor like a fish or a boat or a house, while those things in turn look nothing like a face. 
+
+######
+##PERHAPS MAKE HERE A RANDOM GRAYSCALE IMAGE so they can see that it looks nothing like that! 
+#######
 Q8: Do you think it is a logical step to perform PCA, a linear dimension reduction method, on this (type of) data?
+
+#Answer: No, not really. You have heard about manifold methods, and given the question above, it would be more logical to try one of those manifold methods to find the subspace in these 62500 dimensions in which to best represent faces. So why do we do this? One, it is a classic example where you can see what PCA is doing. Two: it will show you that even though the linear approach might not seem the most logical, it can still do the job quite well if necessary. Don't be afraid to just use PCA to see what you get in exploratory data analysis, especially before moving on to (much) more complicated methods!
 
 ##
 
@@ -774,6 +894,8 @@ for (component in seq(1:10)) {
 In these images, the greyer an area, the larger its importance on this Principal component.##IS THIS TRUE?
 
 Q11: First, scroll up to look at the normal input faces we fed into our PCA again. Given the variability in these faces (and backgrounds!), what do you think the first five principal components might roughly correspond to? Think of orientation (left-right and where the face is in the image), background brightness, and some prominent facial features. (Note: this question is hard to do wrong, but also hard to do exactly right).
+
+#Answer: it seems that at least one dimension corresponds to the lighting of the background around the faces, and others might focus in on hair.
 
 Q12: The first principal component is the dimension along which faces in this dataset vary the most from the mean. Why do you think that it looks as it does?
 
