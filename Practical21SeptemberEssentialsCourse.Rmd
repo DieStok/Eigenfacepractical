@@ -34,7 +34,7 @@ install.packages("BiocManager"); require(BiocManager)}
 if(!require(pacman)) {
 install.packages("pacman"); require(pacman)}
 #load packages we want to use
-p_load(ggplot2, magrittr, plyr, tidyverse, EBImage, stringr, devtools, R.matlab, gganimate, png, gifski, knitr)
+p_load(ggplot2, magrittr, plyr, tidyverse, EBImage, stringr, devtools, R.matlab, gganimate, png, gifski, knitr, ggdendro)
 
 #some packages are not on CRAN, so need to be downloaded manually
 install_github("vqv/ggbiplot")
@@ -42,6 +42,15 @@ install_github("vqv/ggbiplot")
 #options(dplyr.summarise.inform = FALSE)
 
 ```
+
+##########################################
+#
+#       K-means clustering and PCA start
+#
+##########################################
+
+
+
 
 
 ```{r}
@@ -403,9 +412,9 @@ Q8: in the code block below, run ggbiplot::ggscreeplot() on the output of the di
 
 
 
-Now, let's run kmeans on the multidimensional data, and then show the groups found in the 2D space. Note that R's k-means function automatically does multiple initialisations and chooses the 'best' clusters (it is smarter than the basic k-means explained in the lectures) 
+Now, let's run kmeans on the multidimensional data, and then show the groups found in the 2D space. Note that R's k-means function automatically does multiple initialisations and chooses the 'best' clusters (it is smarter than the basic k-means explained in the lectures). We'll use it here. Below is the example for the 2D data. You need to do the same thing, but for the 4D data (with 2 noisy genes added) and 5D data (with 3). 
 
-Run this procedure also for the 4D and 5D data. So:
+So:
 -select the columns you need
 -perform k-means
 -plot a ggbiplot where you colour the actual clusters ("True Cluster" column)
@@ -609,39 +618,155 @@ Q12: It might seem contrived that we are straight-up adding noise. Of course tha
 #####
 
 
-#something about hierarchical clustering
+
+
+________________________________________________________________________________
+________________________________________________________________________________
 
 
 
 
+########################################
+#
+#       Hierarchical clustering
+#
+########################################
+
+That's all for k-means, one of the most well-known types of clustering using the prototype method. However, another large branch of clustering is hierarchical clustering. We use it in phylogeny, for instance. Let's use it on the initial data we generated all the way at the top and see what we get. If you want a nice beginner's guide for hierarchical clustering, look here: https://www.datacamp.com/community/tutorials/hierarchical-clustering-R 
+
+
+```{r}
+
+dataHierarchical = dataforClustering %>% select(-contains("True "))
+print("Summary before scaling:")
+summary(dataHierarchical)
+dataHierarchical = as.data.frame(scale(dataHierarchical))
+
+print("Summary after scaling:")
+summary(dataHierarchical)
+
+ggplot(data = dataHierarchical, aes_string(x = "`Gene 1 Expression`", y = "`Gene 2 Expression`")) + geom_point(size = 3) +
+  theme_bw() +
+  ggtitle("Scaled data for hierarchical clustering")
+
+#label the points by trueClusterNr_dataPointNr by setting rownames.
+rownames(dataHierarchical) = paste0(dataforClustering$`True Cluster`, "_", rep(seq(1:25), 4))
+
+#Answer SD:
+print("SD after scaling:")
+apply(dataHierarchical, 2, sd)
+
+```
+
+Q1: What, exactly, does the scale command do in the code block above? Look at the mean and standard deviation after scaling. (For standard deviation, use the sd() command). 
+
+#Answer: It sets the mean to 0 and the standard deviation to 1. So it scales the data to a normal distribution centered at 0 and with an SD of 1.
+
+Q2: What is the importance of scaling? Think about the Euclidean distance metric in relation to unscaled characteristics. For instance: height (in m) and weight (in kg) of a person. What does scaling do?
+
+#Answer: height is unlikely to vary more than 1 unit, between 1 and 2 meters, mostly. Weight, however, can vary easily from 50-120 kg. If you think about distance calculations, this means that if you don't scale, the weight in kilograms would always dominate the distance between data points. Probably, you care about both weight and height in how similar you find two people, so you need to scale.
+
+Q3: We didn't scale before for k-means. Do you think this is because k-means is less affected by unscaled data than hierarchical clustering? 
+
+#Answer: k-means uses a distance metric, just as much as hierarchical clustering does. That's not it. Because we generated the data ourselves, we could make sure that their mean and distributions were almost the same. The data were already (more or less) on the same scale. In a real example, it would be best practice to just scale before doing these things.
+
+
+On to the clustering. In the code block below, use the dist() function to calculate the Euclidean distance. Then use the hclust() function to cluster observations using average linking, complete linking, and single linking. Finally, plot the results using ggdendrogram(). You can add a title and use theme_bw() to make the plots somewhat nicer. You can also use theme(axis.text.x = element_text(angle = 90, vjust = 0, hjust=1)) to rotate the x-axis labels.
+
+
+```{r, fig.width= 13}
 
 
 
+#####
+#answer
+#####
 
 
+distanceMat = dist(dataHierarchical, method = "euclidean")
+avgCluster  = hclust(distanceMat, method = "average")
+comCluster  = hclust(distanceMat)
+singCluster = hclust(distanceMat, method = "single")
+plotClustav = ggdendrogram(avgCluster) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0, hjust=1)) +
+  ggtitle("Average linkage clustering (UPGMA)")
+plotClustco = ggdendrogram(comCluster) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0, hjust=1)) +
+  ggtitle("Complete linkage clustering")
+plotClustsi = ggdendrogram(singCluster) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0, hjust=1)) +
+  ggtitle("Single linkage clustering")
 
 
+show(plotClustav)
+show(plotClustco)
+show(plotClustsi)
+```
 
 
+Q4 Describe in your own words what single linkage, complete linkage, and average linkage do.
 
+#Answer: single linkage links a cluster to another cluster based on the single smallest distance to that other cluster. So in clusters with 100 points each, 1 outlier point in 1 cluster could be closest to another outlier point in another cluster, and that would cause those two clusters to be linked. 
+#Complete linkage is the opposite: clusters are linked based on the points in them that are furthest apart. So it will only tend to combine clusters that are really close.
+#Average linkage calculates distances of all points between clusters, then calculates the average, and links based on that.
 
+Q5: What differences do you see between the plots for the different methods? Look at the scales as well.
 
+#Answer: single linkage produces long chains. This is logical, because each time the next closest point is added to a cluster. Here it functions quite well, but usually it fares poorly. Distances there are very short.
+#Complete linkage produces the largest distances, but otherwise looks pretty similar in structure to average linkage. #Average linkage produces intermediate distances, as you'd expect.
 
+Q6: What final step do you need to take to get clusters, based on what you want out of your clustering?
+#Answer: you need to cut this chart somewhere horizontally, and take the clusters at that level of the hierarchical clustering. 
 
+Q7: Try one more clustering linkage method in the code block below, be it "WPGMA", "WPGMC" or "centroid". Look at https://stats.stackexchange.com/questions/195446/choosing-the-right-linkage-method-for-hierarchical-clustering for a short explanation of what each of these methods does. Do you see any significant differences from the 3 plots you made above?
 
+#Answer: for centroid clustering, for example, you get strange 3-way splits and distances going up. This looks positively strange, but the explanation might be that two separate clusters that you combine suddenly have a centroid that is much closer to another cluster than their separate centroids were before. Or the plotting function might be malfunctioning, I am unsure to be completely honest.
 
+```{r, fig.width= 13}
+#####
+#Answer
+#####
 
+centroidClust     = hclust(distanceMat, method = "centroid")
+plotClustCentroid = ggdendrogram(centroidClust) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0, hjust=1)) +
+  ggtitle("Centroid linkage clustering (UPGMC)")
+show(plotClustCentroid)
+```
 
+That's fine and dandy, but now we'd like to use these clusters. So, how do you cut the dendrogram and use the resultant clusters? Using cutree() on the objects you got from running the hclust() function. Up to you to use cutree to get 4 clusters that were clustered using average linkage and plotting them. Then, try 8 clusters and plot those. Finally, try it on single linkage data with 4 clusters.
 
+```{r}
 
+#####
+# Answer
+#####
+clustersAvgLinkage = cutree(avgCluster, k = 4)
+ggplot(data = dataHierarchical %>% mutate(clusterUPGMA = as.factor(clustersAvgLinkage)),
+       aes(x = `Gene 1 Expression`, y = `Gene 2 Expression`, colour = clusterUPGMA)) +
+  geom_point() +
+  theme_bw()
 
+clustersAvgLinkageEight = cutree(avgCluster, k = 8)
+ggplot(data = dataHierarchical %>% mutate(clusterUPGMA = as.factor(clustersAvgLinkageEight)),
+       aes(x = `Gene 1 Expression`, y = `Gene 2 Expression`, colour = clusterUPGMA)) +
+  geom_point() +
+  theme_bw()
 
+clustersSingLinkageFour = cutree(singCluster, k = 4)
+ggplot(data = dataHierarchical %>% mutate(clustSingLink = as.factor(clustersSingLinkageFour)),
+       aes(x = `Gene 1 Expression`, y = `Gene 2 Expression`, colour = clustSingLink)) +
+  geom_point() +
+  theme_bw()
 
+```
+Q8: What do you think of the single linkage clustering?
 
-
-
-
-
+#Answer: One cluster is one point, which is quite hilarious. It happens because this point is so far from the other in the bottom right cluster that it only joins them as the last point. Meanwhile, the left two clusters have a sort of bridge between them that apparently allow them to be more easily combined.
 
 
 
@@ -651,8 +776,14 @@ ________________________________________________________________________________
 ___________________________________________________________________________________________________________
 
 
+########################################
+#
+#       PCA eigenface part
+#
+########################################
 
-#part 2 eigenface introduction to PCA
+
+
 Now, let's use something that our brains are especially well-wired to interpret and think about: faces.
 
 The question is: can we take pictures of human faces, run them through dimensionality reduction, and still keep most of the, well, face-ness intact? Start by running the code below to import images of faces (specifically, from here: http://vis-www.cs.umass.edu/lfw/ , and within that data only those people whose names start with a).
@@ -667,7 +798,8 @@ str(fileNames)
 
 #read in the images
 imageList = lapply(paste0(faceDir, "/", fileNames), readImage)
-str(imageList)
+#look at what each image looks like.
+str(imageList[[1]])
 
 
 
@@ -777,7 +909,6 @@ hist(tableNames)
 
 
 
-
 Now that you've gotten to know the data some, let's do what we set out to do. First, let's think about the dimensionality of the input space. You can use the code block below to answer these questions.
 
 Q5: What do the numbers printed in the matrix signify? 
@@ -836,7 +967,9 @@ for (imageMatrixIndex in seq_along(greyImageList)) {
 }
 rownames(greyImageDataFrame) = paste0(rep("pixel", length(someImage)), seq(1,length(someImage)))
 colnames(greyImageDataFrame) = paste0(rep("face", length(imageList)), seq(1,length(imageList)))
-#over to you. We now have a 62500*1054 data.frame with pixel data. Calculate the average face, display it, and subtract the average values from the data.
+
+
+#Over to you. We now have a 62500*1054 data.frame with pixel data. Calculate the average face, display() it, and subtract the average values from the data.
 
 
 ##ANSWER##
@@ -855,7 +988,7 @@ meanSubtractedGreyImageDataFrame = greyImageDataFrame - avgFace
 ```
 
 
-Okay, with that done we can do our PCA. We'll pare our set down to 256 faces to speed up calculation. The beauty of this approach is that we can visualise what, exactly, PCA is doing. Normally, we cannot. Go ahead and run the following code. In it, we perform PCA, and then look at the 10 eigenvectors with the largest eigenvalues, or in less technical terms: the 10D representation of the data that captures most of the variance. Since each eigenvector is 62500-dimensional, you can simply put it back into the form of an image and look at it, to see what each image represents. In other words: you can look at the largest variance from the mean face, and then the second largest, etc. in this dataset. This allows you to visually inspect what each principal component might represent.
+Okay, with that done we can do our PCA. We'll pare our set down to 256 faces to speed up calculation. The beauty of this approach is that we can visualise what, exactly, PCA is doing. Normally, we cannot. Go ahead and run the following code. In it, we perform PCA, and then look at the 10 eigenvectors with the largest eigenvalues, or in less technical terms: the 10D representation of the data that captures most of the variance in the original data. Since each eigenvector is 62500-dimensional, you can simply put it back into the form of an image and look at it, to see what each image represents. In other words: you can look at the largest variance from the mean face, and then the second largest, etc. in this dataset. This allows you to visually inspect what each principal component might be measuring variance in.
 
 
 ```{r, fig.width=7, fig.height=7}
@@ -891,7 +1024,7 @@ for (component in seq(1:10)) {
 
 ```
 
-In these images, the greyer an area, the larger its importance on this Principal component.##IS THIS TRUE?
+In these images, the blacker or bright whiter an area, the larger its variance on this Principal component. 
 
 Q11: First, scroll up to look at the normal input faces we fed into our PCA again. Given the variability in these faces (and backgrounds!), what do you think the first five principal components might roughly correspond to? Think of orientation (left-right and where the face is in the image), background brightness, and some prominent facial features. (Note: this question is hard to do wrong, but also hard to do exactly right).
 
