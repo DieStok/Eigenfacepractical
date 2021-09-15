@@ -1480,34 +1480,22 @@ Q8: Why are UMAP and t-SNE so much better at getting the data into visually plea
 #
 #########################################################################
 
-The practical has become progressively more hands-on (well, at least, that was the intention). Now is the time for the piece de resistance, coup de grace, the one and only omelet du fromage. You can quickly scan this paper: https://www.sciencedirect.com/science/article/pii/S2211124719305273#mmc1 (a pdf is also included in the folder you downloaded from GitHub). Using the data (https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE122687) and Seurat (https://satijalab.org/seurat/), try to replicate (part of) Figure 1B from the paper. Given the legend from figure S1E, you'll need the FindClusters() function from Seurat for this. 
+The practical has become progressively more hands-on (well, at least, that was the intention). Now is the time for the piece de resistance, coup de grace, the one and only omelet du fromage. You can quickly scan this paper: https://www.sciencedirect.com/science/article/pii/S2211124719305273#mmc1 (a pdf is also included in the folder you downloaded from GitHub). Using the data (https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE122687) and Seurat (https://satijalab.org/seurat/), try to replicate (part of) Figure 1B from the paper. Given the legend from figure S1E, you'll need the FindClusters() function from Seurat for this. You'll probably need all data from files A to J, although do check table S1 because some are replicates. Feel free to only make a visualisation for 1 dataset, (only A or only G, for instance), or to remove replicates. The files can be confusing, and that's the idea, because it's what you might run into in the wild. You can look up accessions here: https://www.arabidopsis.org/servlets/TairObject?type=locus&name=At1g01020 (this is an example of one location whose transcripts were tallied). Be sure to click through on the GEO site with data to see how subdatasets were made and what they represent (for instance, for replicate A: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3478125).
+
+To work with this data, you might need various functions from the tidyverse. See beginner cheatsheet here: http://datacamp-community-prod.s3.amazonaws.com/c1fae72f-d2d7-4646-9dce-dd0f8fb5c5e8; dplyr cheat sheet : https://dplyr.tidyverse.org/; readr (data read-in) cheat sheet: https://readr.tidyverse.org/ ; ggplot cheat sheet: https://ggplot2.tidyverse.org/. These cheat sheets are also in the aptly named cheat sheets folder of the repository you cloned. Good luck!
+
+So:
+-scan the paper
+-download the data, look at the data provenance (what sort of data is it? How was it processed?)
+-make a tSNE (or UMAP) plot of the same type as that in figure 1B of the paper, either on all the data from dataset A to J, or on a subset if you want.
 
 
+```{r}
 
-
-
-
-
-
-
-
-
-
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+#The end!
